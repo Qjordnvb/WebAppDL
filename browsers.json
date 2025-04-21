@@ -1,0 +1,42 @@
+{
+  "chrome": {
+    "default": "120.0",
+    "versions": {
+      "120.0": {
+        "image": "selenoid/vnc_chrome:122.0",
+        "port": "4444",
+        "path": "/",
+        "tmpfs": {
+          "/tmp": "size=512m"
+        },
+        "shmSize": 2147483648,
+        "enableVNC": true,
+        "startupTimeout": "300s",
+        "env": [
+          "SCREEN_WIDTH=1920",
+          "SCREEN_HEIGHT=1080",
+          "SCREEN_DEPTH=24"
+        ],
+        "selenoid:options": {
+          "enableLog": true
+        },
+        "healthCheck": "/"
+      },
+      "122.0": {
+        "image": "selenoid/vnc:chrome_122.0",
+        "port": "4444",
+        "path": "/",
+        "tmpfs": {
+          "/tmp": "size=512m"
+        },
+        "shmSize": 2147483648,
+        "enableVNC": true,
+        "startupTimeout": "120s",
+        "selenoid:options": {
+          "enableLog": true
+        },
+        "healthCheck": "/"
+      }
+    }
+  }
+}

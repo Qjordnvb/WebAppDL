@@ -1,0 +1,17 @@
+# WebAppDL/.gitignore
+venv/
+__pycache__/
+*.pyc
+db.sqlite3
+/staticfiles/
+/media/
+/logs/ # Si creas logs fuera de Docker
+/reports/ # Excluir reportes generados
+/uploads/ # Excluir JSON subidos
+.env # Variables de entorno
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Playwright cache/downloads
+/ms-playwright/

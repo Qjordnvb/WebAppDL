@@ -1,0 +1,42 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "event",
+      "event_category",
+      "event_action",
+      "event_label"
+    ],
+    "properties": {
+      "event": {
+        "type": "string"
+      },
+      "event_category": {
+        "type": "string"
+      },
+      "event_action": {
+        "type": "string"
+      },
+      "event_label": {
+        "type": "string"
+      },
+      "user_type": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "interaction": {
+        "type": "string"
+      },
+      "component_name": {
+        "type": "string"
+      },
+      "element_text": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": true
+  }
+}

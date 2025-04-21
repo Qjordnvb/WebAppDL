@@ -1,0 +1,43 @@
+{# core/templates/core/session_page.html #}
+{% extends "base.html" %} {# Asume que tienes un base.html #}
+{% load static %} {# Necesario para cargar archivos estáticos como JS #}
+
+{% block title %}Sesión {{ session_id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Sesión de Validación</h1>
+    <p><strong>ID Sesión:</strong> <span id="session-id">{{ session_id }}</span></p>
+    <p><strong>URL Validada:</strong> <span id="vnc_url">{{ session_url }}</span></p>
+    <hr>
+
+    {# ---- Área para mostrar información dinámica ---- #}
+    <div class="row">
+        <div class="col-md-8">
+            <h4>Navegador Simulado</h4>
+            <div id="browser-display" style="min-height: 400px; border: 1px solid #ccc; background-color: #f8f9fa; padding: 10px;">
+                <p><strong>URL Actual:</strong> <span id="current-url">{{ session_url }}</span></p>
+                <p><strong>Estado Navegador:</strong> <span id="browser-state">Conectando...</span></p>
+                {# Aquí irá el screenshot más adelante #}
+            </div>
+        </div>
+        <div class="col-md-4">
+            <h4>DataLayers Capturados</h4>
+            <div id="datalayer-list" style="max-height: 500px; overflow-y: auto; border: 1px solid #ccc; background-color: #f8f9fa; padding: 10px;">
+                <p class="text-muted">Esperando DataLayers...</p>
+            </div>
+        </div>
+    </div>
+    {# ---- Fin Área dinámica ---- #}
+
+</div>
+
+{# Pasar el session_id a JavaScript de forma segura #}
+{{ session_id|json_script:"session-id" }}
+
+{% endblock %}
+
+{% block extra_js %}
+  {# Carga tu archivo JS principal de la sesión #}
+   <script src="{% static 'core/js/session_app.js' %}"></script
+{% endblock %}

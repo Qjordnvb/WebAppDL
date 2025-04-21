@@ -1,0 +1,16 @@
+{# core/templates/core/start_session_form.html #}
+{% extends "base.html" %} {# Asume que tienes un base.html con Bootstrap, etc. #}
+
+{% block title %}Iniciar Nueva Sesión{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Iniciar Nueva Sesión de Validación</h2>
+    <hr>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }} {# Renderiza el formulario como párrafos #}
+        <button type="submit" class="btn btn-primary">Iniciar Sesión</button>
+    </form>
+</div>
+{% endblock %}

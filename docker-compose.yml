@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7.2
+    ports:
+      - "6379:6379"
+    networks:
+      - app_net # Mantenemos red explícita
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile # NO necesita cambios
+    command: daphne -b 0.0.0.0 -p 8000 webappdl.asgi:application
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - selenium-chrome # Depende del nuevo servicio Selenium
+    environment:
+      - PYTHONUNBUFFERED=1
+      # --- CAMBIO: Apunta al nuevo servicio y endpoint estándar ---
+      - SELENOID_URL=http://selenium-chrome:4444/wd/hub
+      # ----------------------------------------------------------
+    restart: unless-stopped
+    networks:
+      - app_net
+
+  # --- NUEVO SERVICIO: Selenium Standalone con Chrome y VNC ---
+  selenium-chrome:
+    # Usamos la imagen oficial de Selenium con Chrome y VNC (debug)
+    image: selenium/standalone-chrome-debug:latest
+    container_name: selenium-chrome-debug
+    ports:
+      - "4444:4444" # Puerto Selenium WebDriver
+      - "7900:7900" # Puerto VNC (Contraseña default: secret)
+    # shm_size sigue siendo importante para Chrome
+    shm_size: '2gb'
+    networks:
+      - app_net
+    restart: unless-stopped
+  # --- FIN NUEVO SERVICIO ---
+
+  # --- SERVICIOS 'selenoid' y 'selenoid-ui' ELIMINADOS ---
+
+# --- Definición de la Red (Mantenemos la explícita) ---
+networks:
+  app_net:
+    driver: bridge
+# -----------------------------------------------------
