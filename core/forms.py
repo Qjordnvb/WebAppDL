@@ -9,11 +9,11 @@ class StartSessionForm(forms.Form):
         label="URL del Sitio Web",
         widget=forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'https://ejemplo.com'})
     )
-    reference_json_content = forms.CharField(
+    reference_schema = forms.CharField(
         required=True,
-        label="Contenido JSON de Referencia",
-        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 10}),
-        help_text="Pega aquí el contenido completo del archivo JSON de DataLayers esperados."
+        label="Contenido JSON de Referencia/Schema",  # <-- Etiqueta actualizada (opcional)
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 10}),
+        help_text="Pega aquí el contenido completo del archivo JSON de DataLayers esperados o el schema.",
     )
     description = forms.CharField(
         required=False,
@@ -22,12 +22,14 @@ class StartSessionForm(forms.Form):
     )
 
     # Validación básica del JSON
-    def clean_reference_json_content(self):
-        content = self.cleaned_data['reference_json_content']
+    def clean_reference_schema(self):
+        content = self.cleaned_data["reference_schema"]
         try:
-            # Intenta parsear para validar formato
-            # Podrías añadir validaciones más específicas aquí si es necesario
+            # Intenta parsear para validar formato JSON básico
             json.loads(content)
         except json.JSONDecodeError:
-            raise forms.ValidationError("El contenido introducido no es un JSON válido.")
+            raise forms.ValidationError(
+                "El contenido introducido no es un JSON válido."
+            )
+        # Podrías añadir validación del schema aquí si quisieras usando jsonschema
         return content

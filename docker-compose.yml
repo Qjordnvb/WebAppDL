@@ -1,4 +1,4 @@
-version: '3.8'
+
 
 services:
   redis:
@@ -28,12 +28,31 @@ services:
     restart: unless-stopped
     networks:
       - app_net
-
+  # --- NUEVO SERVICIO CELERY WORKER ---
+  celery-worker:
+    build:
+      context: .         # Usa el mismo Dockerfile que 'web'
+      dockerfile: Dockerfile
+    command: celery -A webappdl worker -l INFO  # Comando para iniciar el worker
+    volumes:
+      - .:/app             # Comparte el código fuente igual que 'web'
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SELENOID_URL=http://selenium-chrome:4444/wd/hub # Necesita acceso a settings
+      # Añade otras variables de entorno que 'web' necesite si acceden a settings
+    depends_on:
+      - web                # Asegura que 'web' (Django) esté listo
+      - redis              # Necesita el broker
+      - selenium-chrome    # Necesitará interactuar con Selenium
+    restart: unless-stopped
+    networks:
+      - app_net
+  # --- FIN NUEVO SERVICIO CELERY WORKER ---
   # --- NUEVO SERVICIO: Selenium Standalone con Chrome y VNC ---
   selenium-chrome:
     # Usamos la imagen oficial de Selenium con Chrome y VNC (debug)
-    image: selenium/standalone-chrome-debug:latest
-    container_name: selenium-chrome-debug
+    image: selenium/standalone-chrome:4.18.1-20240224
+    container_name: selenium-chrome
     ports:
       - "4444:4444" # Puerto Selenium WebDriver
       - "7900:7900" # Puerto VNC (Contraseña default: secret)

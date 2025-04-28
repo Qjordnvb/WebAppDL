@@ -1,143 +1,144 @@
 // core/static/core/js/session_app.js
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOM Cargado. Iniciando JS de sesión.");
+    console.log("DOM Cargado. Iniciando JS de sesión (Polling Version).");
 
-    // --- Obtener Session ID ---
-    const sessionIdElement = document.getElementById('session-id');
-    const sessionId = document.getElementById("session-id").textContent.trim();
+    // --- Obtener Session ID y URL de Status ---
+    const sessionId = JSON.parse(document.getElementById('session-id-data').textContent);
+    const statusUrl = JSON.parse(document.getElementById('status-url-data').textContent);
 
     // --- Obtener elementos de la UI ---
-    const currentUrlElement = document.getElementById('current-url');
-    const browserStateElement = document.getElementById('browser-state');
-    // *** Seleccionamos el contenedor de la lista de DataLayers ***
-    const datalayerListElement = document.getElementById('datalayer-list');
-    // *** Variable para saber si ya hemos limpiado el placeholder ***
-    let datalayerPlaceholderRemoved = false;
+    const statusElement = document.getElementById('session-status');
+    const vncLinkContainer = document.getElementById('vnc-link-container');
+    const vncLinkElement = document.getElementById('vnc-link');
+    const finishButtonContainer = document.getElementById('finish-button-container');
+    const finishButton = document.getElementById('finish-button');
+    const reportLinkContainer = document.getElementById('report-link-container');
+    const reportLinkElement = document.getElementById('report-link');
 
+    let pollingIntervalId = null; // Variable para guardar el ID del intervalo
+    const POLLING_INTERVAL_MS = 3000; // Consultar cada 3 segundos
 
-    if (!sessionId) {
-        console.error("¡Error crítico! No se pudo obtener el session_id del HTML.");
-        if (browserStateElement) browserStateElement.textContent = "Error: Falta ID de Sesión";
+    if (!sessionId || !statusUrl) {
+        console.error("¡Error crítico! Falta session_id o status_url.");
+        if (statusElement) statusElement.textContent = "Error de Configuración";
         return;
     }
 
     console.log("Session ID:", sessionId);
+    console.log("Status URL:", statusUrl);
 
-    // --- Configuración WebSocket ---
-    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
-    const wsURL = `${wsScheme}://${window.location.host}/ws/session/${sessionId}/`;
-    let socket;
+    // --- Función para actualizar UI basada en datos ---
+    function updateUI(data) {
+        if (!data) return;
 
-    function connectWebSocket() {
-        console.log(`Intentando conectar a: ${wsURL}`);
-        if (browserStateElement) browserStateElement.textContent = "Conectando...";
+        // Actualizar texto de estado
+        if (statusElement) {
+            statusElement.textContent = data.status || 'Desconocido';
+        }
 
-        socket = new WebSocket(wsURL);
-
-        // --- Manejadores de Eventos WebSocket ---
-        socket.onopen = (event) => {
-            console.log("WebSocket Conectado!");
-            if (browserStateElement) browserStateElement.textContent = "Conectado, inicializando navegador...";
-            socket.send(JSON.stringify({
-                action: "init_browser"
-            }));
-        };
-
-        socket.onmessage = (event) => {
-            console.log("Mensaje recibido:", event.data);
-            let data;
-            try {
-                data = JSON.parse(event.data);
-            } catch (e) {
-                console.error("Error parseando mensaje JSON:", e);
-                return;
+        // Mostrar/Ocultar enlace VNC y habilitar/deshabilitar botón Finalizar
+        if (data.status_code === 'waiting_user') {
+            // --- INICIO: Bloque Simplificado ---
+            if (data.vnc_url && vncLinkElement && vncLinkContainer) {
+                // Ahora data.vnc_url contiene la URL directa, la usamos tal cual
+                console.log("VNC URL recibida:", data.vnc_url); // Log para verificar
+                vncLinkElement.href = data.vnc_url;
+                vncLinkContainer.style.display = 'block'; // Mostrar contenedor del botón
+            } else {
+                 console.warn("vnc_url no recibida o elementos no encontrados.");
+                 vncLinkContainer.style.display = 'none'; // Ocultar si no hay URL
             }
+            // --- FIN: Bloque Simplificado ---
 
-            // Procesar acción
-            switch (data.action) {
-                case "browser_state":
-                    if (browserStateElement) browserStateElement.textContent = data.state || 'Desconocido';
-                    break;
-                case "browser_ready":
-                    console.log("Browser listo:", data);
-                    if (browserStateElement) browserStateElement.textContent = "Navegador Listo";
-                    break;
-                case "navigation_complete":
-                    if (currentUrlElement) currentUrlElement.textContent = data.url || 'N/A';
-                    if (browserStateElement) browserStateElement.textContent = "Listo"; // Más simple que 'Navegación Completa'
-                    break;
-                case "navigation_error":
-                    if (browserStateElement) browserStateElement.textContent = `Error Navegación: ${data.error || 'Desconocido'}`;
-                    console.error("Error de navegación recibido:", data);
-                    break;
-                case "error": // Errores generales del backend
-                    if (browserStateElement) browserStateElement.textContent = `Error Backend: ${data.message || 'Desconocido'}`;
-                    console.error("Error general recibido:", data);
-                    break;
+            if (finishButton) finishButton.disabled = false; // Habilitar botón Finalizar
+             if (finishButtonContainer) finishButtonContainer.style.display = 'block';
 
-                // --- INICIO NUEVO MANEJADOR ---
-                case "new_datalayer":
-                    console.log("Nuevo DataLayer recibido:", data.payload);
-                    if (datalayerListElement && data.payload) {
-                        // Limpiar el mensaje "Esperando..." solo la primera vez
-                        if (!datalayerPlaceholderRemoved) {
-                            const placeholder = datalayerListElement.querySelector('.text-muted');
-                            if (placeholder) {
-                                placeholder.remove();
-                            }
-                            datalayerPlaceholderRemoved = true;
-                        }
+        } else {
+            // Ocultar enlace y deshabilitar/ocultar botón si no está esperando al usuario
+            if (vncLinkContainer) vncLinkContainer.style.display = 'none';
+            if (finishButton) finishButton.disabled = true;
+             if(['processing', 'completed', 'error', 'finish_requested'].includes(data.status_code)) {
+                 if (finishButtonContainer) finishButtonContainer.style.display = 'none';
+             } else {
+                 if (finishButtonContainer) finishButtonContainer.style.display = 'block';
+             }
+        }
 
-                        // Crear un nuevo elemento para mostrar el DataLayer
-                        const dlElement = document.createElement('div');
-                        dlElement.style.borderBottom = "1px solid #eee"; // Separador visual
-                        dlElement.style.marginBottom = "10px";
-                        dlElement.style.paddingBottom = "10px";
+        // Mostrar enlace al reporte si está completado
+        if (data.status_code === 'completed') {
+             // Asumimos que el backend devolverá 'report_url' en el futuro
+             const reportUrl = data.report_url; // NECESITAREMOS AÑADIR ESTO A LA RESPUESTA JSON
+             if(reportUrl && reportLinkContainer && reportLinkElement) {
+                 reportLinkElement.href = reportUrl;
+                 reportLinkContainer.style.display = 'block';
+             } else {
+                  reportLinkContainer.style.display = 'none';
+             }
+             stopPolling(); // Detener polling si está completado
+        } else {
+             if (reportLinkContainer) reportLinkContainer.style.display = 'none';
+        }
 
-                        const preElement = document.createElement('pre');
-                        preElement.style.whiteSpace = "pre-wrap"; // Para que el texto se ajuste
-                        preElement.style.wordBreak = "break-all"; // Para romper palabras largas si es necesario
-                        preElement.style.maxHeight = "200px"; // Limitar altura
-                        preElement.style.overflowY = "auto"; // Scroll si es muy largo
-                        preElement.style.backgroundColor = "#e9ecef"; // Fondo ligero
-                        preElement.style.padding = "5px";
-                        preElement.style.borderRadius = "4px";
-                        preElement.style.fontSize = "0.85em";
 
-                        // Formatear el JSON para mostrarlo bonito
-                        preElement.textContent = JSON.stringify(data.payload, null, 2); // null, 2 para indentación
-
-                        dlElement.appendChild(preElement);
-
-                        // Añadir el nuevo elemento al PRINCIPIO de la lista
-                        datalayerListElement.prepend(dlElement);
-
-                    } else {
-                        console.warn("No se pudo mostrar el DataLayer: contenedor no encontrado o payload vacío.");
-                    }
-                    break;
-                // --- FIN NUEVO MANEJADOR ---
-
-                default:
-                    console.warn("Acción desconocida recibida del backend:", data.action);
-            }
-        };
-
-        socket.onclose = (event) => {
-            console.warn(`WebSocket Desconectado: Código=${event.code}, Razón='${event.reason}'`);
-            if (browserStateElement) browserStateElement.textContent = `Desconectado (${event.code})`;
-            // Intento de reconexión simple (opcional)
-            // setTimeout(connectWebSocket, 5000);
-        };
-
-        socket.onerror = (error) => {
-            console.error("Error WebSocket:", error);
-            if (browserStateElement) browserStateElement.textContent = "Error de Conexión";
-        };
+        // Detener polling si hay error final
+        if (data.status_code === 'error') {
+             stopPolling();
+        }
     }
 
-    // Iniciar la conexión WebSocket
-    connectWebSocket();
+    // --- Función para realizar la consulta AJAX (Polling) ---
+    function pollStatus() {
+        console.log("Polling status...");
+        fetch(statusUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("Status data received:", data);
+                updateUI(data);
+            })
+            .catch(error => {
+                console.error('Error durante polling:', error);
+                if (statusElement) statusElement.textContent = "Error consultando estado...";
+                // Considerar detener el polling si hay errores repetidos
+                // stopPolling();
+            });
+    }
+
+    // --- Función para detener el polling ---
+    function stopPolling() {
+        if (pollingIntervalId) {
+            console.log("Deteniendo polling.");
+            clearInterval(pollingIntervalId);
+            pollingIntervalId = null;
+        }
+    }
+
+    // --- Iniciar Polling ---
+    // Hacer una llamada inicial inmediata
+    pollStatus();
+    // Establecer el intervalo para llamadas periódicas
+    pollingIntervalId = setInterval(pollStatus, POLLING_INTERVAL_MS);
+
+    // --- Lógica para el botón Finalizar (se añadirá en Paso 7) ---
+    // if (finishButton) {
+    //     finishButton.addEventListener('click', () => {
+    //         // Aquí irá la lógica para llamar a la vista finish_session_view
+    //         console.log("Botón Finalizar clickeado - Lógica pendiente");
+    //         finishButton.disabled = true; // Deshabilitar al hacer click
+    //         if (statusElement) statusElement.textContent = "Finalización solicitada...";
+    //         stopPolling(); // Detener polling al finalizar manualmente
+    //         // Llamada fetch POST a la URL de finalización...
+    //     });
+    // }
+
+    // --- Limpieza al salir de la página (opcional) ---
+    // window.addEventListener('beforeunload', () => {
+    //     stopPolling();
+    // });
 
 });

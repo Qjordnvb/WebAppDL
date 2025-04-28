@@ -156,3 +156,18 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # No pongas ASGI_APPLICATION aquí abajo de nuevo, ya está definida arriba
 # ASGI_APPLICATION = 'webappdl.asgi.application' # <-- Eliminada línea duplicada
+# -------------------------------------------------------------------------- #
+# CELERY CONFIGURATION
+# -------------------------------------------------------------------------- #
+# URL del Broker (Redis) - 'redis' es el nombre del servicio en docker-compose.yml
+CELERY_BROKER_URL = "redis://redis:6379/0"
+# URL del Backend de Resultados (también Redis) - para almacenar el estado/resultado de las tareas
+CELERY_RESULT_BACKEND = "redis://redis:6379/0"
+# Aceptar contenido JSON para tareas y resultados
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+# Zona horaria para Celery (opcional pero recomendado)
+CELERY_TIMEZONE = TIME_ZONE  # Usa la misma TIME_ZONE de Django
+
+# -------------------------------------------------------------------------- #

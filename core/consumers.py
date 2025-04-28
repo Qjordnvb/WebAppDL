@@ -84,11 +84,13 @@ class SessionConsumer(AsyncWebsocketConsumer):
         if action == "datalayer_push":
             await self.send_message("new_datalayer", {"payload": data})
         elif action == "browser_ready":
-            logger.info(f"Notificando browser_ready con VNC URL: {data.get('vnc_url')}")
+            logger.info(
+                f"Notificando browser_ready con VNC URL: {data.get('vnc_info')}"
+            )
             payload = {
                 "session_id": self.session_id,
-                "vnc_url": data.get("vnc_url"),
-                "cdp_url": data.get("cdp_url")
+                "vnc_info": data.get("vnc_info"),
+                "cdp_url": data.get("cdp_url"),
             }
             await self.send_message("browser_ready", payload)
         elif action in ["browser_state", "navigation_complete", "navigation_error", "error"]:

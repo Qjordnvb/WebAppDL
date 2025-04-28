@@ -1,16 +1,21 @@
-# WebAppDL/Dockerfile (Versión con imagen oficial de Playwright)
+# WebAppDL/Dockerfile
 
-FROM python:3.11-slim
+FROM python:3.13.3-alpine
 
 
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
-# *** NUEVO: Instalar tzdata ANTES de requerimientos Python ***
-RUN apt-get update && apt-get install -y --no-install-recommends tzdata && rm -rf /var/lib/apt/lists/*
+
+RUN apk add --no-cache \
+    build-base \
+    linux-headers \
+    musl-dev \
+    openssl-dev \
+    tzdata
 
 # Instalar dependencias de Python
 COPY requirements.txt /app/
