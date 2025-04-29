@@ -9,15 +9,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Obtener elementos de la UI ---
     const statusElement = document.getElementById('session-status');
-    const vncLinkContainer = document.getElementById('vnc-link-container');
-    const vncLinkElement = document.getElementById('vnc-link');
+    const vncLinkContainer = document.getElementById('vnc-link-container'); // Contenedor para el enlace VNC
+    const vncLinkElement = document.getElementById('vnc-link'); // Elemento <a> del enlace VNC
     const finishButtonContainer = document.getElementById('finish-button-container');
     const finishButton = document.getElementById('finish-button');
     const reportLinkContainer = document.getElementById('report-link-container');
     const reportLinkElement = document.getElementById('report-link');
 
-    let pollingIntervalId = null; // Variable para guardar el ID del intervalo
+    let pollingIntervalId = null;
     const POLLING_INTERVAL_MS = 3000; // Consultar cada 3 segundos
+
+    // --- URL para finalizar la sesión ---
+    const finishUrl = `/session/${sessionId}/finish/`; // URL que crearemos en Django
+    const csrfToken = getCookie('csrftoken'); // Obtener token CSRF para POST
 
     if (!sessionId || !statusUrl) {
         console.error("¡Error crítico! Falta session_id o status_url.");
@@ -39,47 +43,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Mostrar/Ocultar enlace VNC y habilitar/deshabilitar botón Finalizar
         if (data.status_code === 'waiting_user') {
-            // --- INICIO: Bloque Simplificado ---
+            // Mostrar enlace VNC y botón Finalizar
             if (data.vnc_url && vncLinkElement && vncLinkContainer) {
-                // Ahora data.vnc_url contiene la URL directa, la usamos tal cual
-                console.log("VNC URL recibida:", data.vnc_url); // Log para verificar
+                console.log("VNC URL recibida:", data.vnc_url);
                 vncLinkElement.href = data.vnc_url;
-                vncLinkContainer.style.display = 'block'; // Mostrar contenedor del botón
+                vncLinkContainer.style.display = 'block'; // Mostrar contenedor del botón VNC
+                if(finishButtonContainer) finishButtonContainer.style.display = 'block'; // Mostrar botón finalizar
             } else {
-                 console.warn("vnc_url no recibida o elementos no encontrados.");
-                 vncLinkContainer.style.display = 'none'; // Ocultar si no hay URL
+                 console.warn("vnc_url no recibida o elementos VNC no encontrados.");
+                 if (vncLinkContainer) vncLinkContainer.style.display = 'none';
+                 if (finishButtonContainer) finishButtonContainer.style.display = 'none'; // Ocultar también finalizar si VNC no está listo
             }
-            // --- FIN: Bloque Simplificado ---
-
-            if (finishButton) finishButton.disabled = false; // Habilitar botón Finalizar
-             if (finishButtonContainer) finishButtonContainer.style.display = 'block';
+            // Habilitar botón Finalizar
+            if (finishButton) finishButton.disabled = false;
 
         } else {
-            // Ocultar enlace y deshabilitar/ocultar botón si no está esperando al usuario
+            // Ocultar enlace VNC y deshabilitar/ocultar botón si no está esperando
             if (vncLinkContainer) vncLinkContainer.style.display = 'none';
+
             if (finishButton) finishButton.disabled = true;
-             if(['processing', 'completed', 'error', 'finish_requested'].includes(data.status_code)) {
+            // Ocultar contenedor del botón si ya no aplica (procesando, completado, error, etc.)
+            if(['processing', 'completed', 'error', 'finish_requested'].includes(data.status_code)) {
                  if (finishButtonContainer) finishButtonContainer.style.display = 'none';
-             } else {
+            } else {
+                 // Mantener visible pero deshabilitado en otros estados iniciales si es necesario
                  if (finishButtonContainer) finishButtonContainer.style.display = 'block';
-             }
+            }
         }
 
         // Mostrar enlace al reporte si está completado
         if (data.status_code === 'completed') {
-             // Asumimos que el backend devolverá 'report_url' en el futuro
-             const reportUrl = data.report_url; // NECESITAREMOS AÑADIR ESTO A LA RESPUESTA JSON
+             const reportUrl = data.report_url; // Obtener URL del backend (se añadirá en Paso 9)
              if(reportUrl && reportLinkContainer && reportLinkElement) {
+                 console.log("Report URL recibido:", reportUrl);
                  reportLinkElement.href = reportUrl;
-                 reportLinkContainer.style.display = 'block';
+                 reportLinkContainer.style.display = 'block'; // Mostrar contenedor del reporte
              } else {
-                  reportLinkContainer.style.display = 'none';
+                  // console.warn("Report URL no disponible o elementos no encontrados."); // Descomentar para debug
+                  reportLinkContainer.style.display = 'none'; // Ocultar si no hay URL/elementos
              }
              stopPolling(); // Detener polling si está completado
         } else {
-             if (reportLinkContainer) reportLinkContainer.style.display = 'none';
+             if (reportLinkContainer) reportLinkContainer.style.display = 'none'; // Ocultar si no está completado
         }
-
 
         // Detener polling si hay error final
         if (data.status_code === 'error') {
@@ -104,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(error => {
                 console.error('Error durante polling:', error);
                 if (statusElement) statusElement.textContent = "Error consultando estado...";
-                // Considerar detener el polling si hay errores repetidos
+                // Considerar detener el polling si hay errores repetidos o cambiar lógica
                 // stopPolling();
             });
     }
@@ -118,27 +124,88 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- Lógica para el botón Finalizar ---
+    if (finishButton) {
+        finishButton.addEventListener('click', () => {
+            console.log("Botón Finalizar clickeado.");
+            finishButton.disabled = true; // Deshabilitar inmediatamente
+            if (statusElement) statusElement.textContent = "Finalización solicitada...";
+            stopPolling(); // Detener polling al finalizar manualmente
+
+            // Enviar petición POST para cambiar el estado
+            fetch(finishUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken // Incluir token CSRF (requiere getCookie)
+                },
+                // No es necesario enviar body si toda la info está en la URL
+            })
+            .then(response => {
+                // Verificar si la respuesta fue OK (status 2xx)
+                if (!response.ok) {
+                    console.error('Error al solicitar finalización:', response.status, response.statusText);
+                    // Intenta leer el cuerpo del error como JSON
+                    return response.json().then(errData => {
+                       // Lanza un error que incluya el mensaje del backend si existe
+                       throw new Error(errData.error || `Error del servidor: ${response.status}`);
+                    }).catch(() => {
+                        // Si el cuerpo no es JSON o hay otro error al leerlo, lanza error genérico
+                        throw new Error(`Error del servidor: ${response.status} ${response.statusText}`);
+                    });
+                }
+                // Si la respuesta fue OK, parsear el JSON
+                return response.json();
+            })
+            .then(data => {
+                // Verificar si la respuesta JSON indica éxito
+                if(data && data.status === 'ok'){
+                    console.log("Solicitud de finalización enviada con éxito.");
+                    // Actualizamos estado visualmente ya que detuvimos el polling
+                    if (statusElement) statusElement.textContent = "Procesando...";
+                } else {
+                    // Manejar caso donde el status es 2xx pero el JSON no indica 'ok' o tiene un error
+                    const errorMessage = data ? data.error : 'Respuesta inesperada del servidor.';
+                    console.error("Respuesta inesperada/error del servidor al finalizar:", errorMessage);
+                    alert(`Error al finalizar: ${errorMessage}`);
+                    if (statusElement) statusElement.textContent = `Error: ${errorMessage}`;
+                    // Podrías rehabilitar el botón aquí si el estado no cambió
+                    // finishButton.disabled = false;
+                }
+            })
+            .catch(error => {
+                // Capturar errores de red o errores lanzados desde .then()
+                console.error('Error en fetch o procesamiento de respuesta al finalizar:', error);
+                if (statusElement) statusElement.textContent = "Error al procesar finalización...";
+                alert(`Error al finalizar la sesión: ${error.message || error}`);
+                // Considera rehabilitar el botón en caso de error de red
+                // finishButton.disabled = false;
+            });
+        });
+    }
+
     // --- Iniciar Polling ---
-    // Hacer una llamada inicial inmediata
-    pollStatus();
-    // Establecer el intervalo para llamadas periódicas
-    pollingIntervalId = setInterval(pollStatus, POLLING_INTERVAL_MS);
+    pollStatus(); // Llamada inicial
+    pollingIntervalId = setInterval(pollStatus, POLLING_INTERVAL_MS); // Iniciar ciclo
 
-    // --- Lógica para el botón Finalizar (se añadirá en Paso 7) ---
-    // if (finishButton) {
-    //     finishButton.addEventListener('click', () => {
-    //         // Aquí irá la lógica para llamar a la vista finish_session_view
-    //         console.log("Botón Finalizar clickeado - Lógica pendiente");
-    //         finishButton.disabled = true; // Deshabilitar al hacer click
-    //         if (statusElement) statusElement.textContent = "Finalización solicitada...";
-    //         stopPolling(); // Detener polling al finalizar manualmente
-    //         // Llamada fetch POST a la URL de finalización...
-    //     });
-    // }
+    // --- Función auxiliar para obtener el token CSRF de las cookies ---
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        if (!cookieValue) {
+            console.warn('CSRF token cookie not found. POST requests might fail.');
+        }
+        return cookieValue;
+    }
 
-    // --- Limpieza al salir de la página (opcional) ---
-    // window.addEventListener('beforeunload', () => {
-    //     stopPolling();
-    // });
-
-});
+}); // Fin DOMContentLoaded

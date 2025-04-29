@@ -16,6 +16,9 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+MEDIA_URL = '/media/'
+# --- ASEGÚRATE QUE MEDIA_ROOT USE Pathlib ---
+MEDIA_ROOT = BASE_DIR / 'mediafiles'
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 

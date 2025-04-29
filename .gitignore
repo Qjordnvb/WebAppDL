@@ -12,6 +12,6 @@ db.sqlite3
 # Docker
 .dockerignore
 docker-compose.override.yml
-
+datalayers.json
 # Playwright cache/downloads
 /ms-playwright/
